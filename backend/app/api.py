@@ -38,7 +38,9 @@ app.add_middleware(
 
 # ==== MODEL DATA TOPSIS ====
 class InputData(BaseModel):
-    jenisKulit: str
+    c1: str
+    c2: str
+    c3: str
 
 # ==== MODEL KANDUNGAN ====
 class KandunganInput(BaseModel):
@@ -58,21 +60,78 @@ def home():
 @app.post("/analyze")
 def analyze(data: InputData):
     """
-    Endpoint ini menerima input jenis kulit,
-    lalu memanggil fungsi hitung_topsis() untuk menghasilkan rekomendasi skincare.
+    Endpoint ini menerima input c1 (skin type), c2 (acne type), c3 (severity),
+    lalu memanggil fungsi hitung_topsis() untuk menghasilkan rekomendasi kandungan terbaik.
+    
+    Response: {"status": "success", "data": [top result as first item]} 
+    atau bisa juga kembalikan top result langsung
     """
-    hasil = hitung_topsis(data)
-    return {"status": "success", "data": hasil}
+    try:
+        hasil = hitung_topsis(data.c1, data.c2, data.c3)
+        
+        if not hasil:
+            raise HTTPException(status_code=400, detail="Tidak ada hasil analisis")
+        
+        # Kembalikan hasil teratas (index 0) sebagai rekomendasi utama
+        top_result = hasil[0]
+        
+        print(f"POST /analyze -> top kandungan: {top_result['nama']} (score: {top_result['skor']})")
+        
+        return top_result
+        
+    except Exception as e:
+        print(f"Error in /analyze: {e}")
+        raise HTTPException(status_code=500, detail=f"Gagal melakukan analisis: {e}")
 
-# Tambahkan ini di file FastAPI (app/main.py atau file utama)
+# ==== ROUTE PRODUK (PUBLIC) ====
+@app.get("/produk")
+def get_produk(kandungan: Optional[str] = None):
+    """
+    Endpoint untuk mencari produk berdasarkan kandungan.
+    Query parameter: ?kandungan=nama_kandungan
+    """
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    try:
+        if kandungan:
+            # Cari produk yang mengandung keyword (case-insensitive)
+            cursor.execute(
+                "SELECT id, nama, harga, kandungan, foto, deskripsi FROM produk WHERE LOWER(kandungan) LIKE %s",
+                (f"%{kandungan.lower()}%",)
+            )
+        else:
+            # Jika tidak ada parameter, kembalikan semua produk
+            cursor.execute("SELECT id, nama, harga, kandungan, foto, deskripsi FROM produk")
+        
+        products = cursor.fetchall()
+        products = products or []
+        
+        # Sanitize data
+        sanitized = []
+        for r in products:
+            for k, v in list(r.items()):
+                if isinstance(v, Decimal):
+                    r[k] = float(v)
+                elif isinstance(v, (datetime.date, datetime.datetime)):
+                    r[k] = v.isoformat()
+                elif isinstance(v, bytes):
+                    try:
+                        r[k] = v.decode('utf-8')
+                    except Exception:
+                        r[k] = str(v)
+            sanitized.append(r)
+        
+        print(f"GET /produk?kandungan={kandungan} -> fetched {len(sanitized)} rows")
+        return sanitized
+        
+    except Exception as e:
+        print(f"Error fetching products: {e}")
+        raise HTTPException(status_code=500, detail=f"Gagal mengambil produk: {e}")
+    finally:
+        cursor.close()
+        db.close()
 
-from fastapi import APIRouter, Depends
-
-# Tambahkan router/endpoint untuk Produk
-# Karena kamu menggunakan token, ini harus dilindungi (auth)
-# Ini contoh sederhana tanpa auth lengkap:
-
-@app.get("/admin/produk")
+# ==== ROUTE ADMIN PRODUK ====
 def get_all_produk():
     db = get_db()
     cursor = db.cursor(dictionary=True)
@@ -368,6 +427,124 @@ def delete_kandungan(kandungan_id: int = Path(...)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Gagal menghapus kandungan: {e}")
+    finally:
+        cursor.close()
+        db.close()
+
+class KriteriaInput(BaseModel):
+    kode: str
+    nama: str
+    bobot: Union[str, float]
+    tipe: str
+
+@app.get("/admin/kriteria")
+def get_kriteria():
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    
+    try:
+        cursor.execute("SELECT kode, nama, bobot, tipe FROM kriteria")
+        kriteria_list = cursor.fetchall()
+        
+        # Sanitize values for JSON serialization
+        sanitized = []
+        for row in kriteria_list:
+            sanitized_row = {}
+            for key, value in row.items():
+                if isinstance(value, bytes):
+                    sanitized_row[key] = value.decode('utf-8')
+                elif hasattr(value, 'isoformat'):
+                    sanitized_row[key] = value.isoformat()
+                elif hasattr(value, '__float__'):
+                    sanitized_row[key] = float(value)
+                else:
+                    sanitized_row[key] = value
+            sanitized.append(sanitized_row)
+        
+        print(f"GET /admin/kriteria -> fetched {len(sanitized)} rows")
+        return {"data": sanitized}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal mengambil kriteria: {e}")
+    finally:
+        cursor.close()
+        db.close()
+
+@app.post("/admin/kriteria")
+def add_kriteria(data: KriteriaInput):
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    
+    try:
+        bobot = float(data.bobot) if isinstance(data.bobot, str) else data.bobot
+        
+        cursor.execute(
+            "INSERT INTO kriteria (kode, nama, bobot, tipe) VALUES (%s, %s, %s, %s)",
+            (data.kode, data.nama, bobot, data.tipe)
+        )
+        db.commit()
+        
+        print(f"POST /admin/kriteria -> added kriteria: {data.kode}")
+        return {"detail": "Kriteria berhasil ditambahkan"}
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Gagal menambahkan kriteria: {e}")
+    finally:
+        cursor.close()
+        db.close()
+
+@app.put("/admin/kriteria/{kode}")
+def edit_kriteria(kode: str, data: KriteriaInput):
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    
+    try:
+        bobot = float(data.bobot) if isinstance(data.bobot, str) else data.bobot
+        
+        cursor.execute(
+            "UPDATE kriteria SET nama = %s, bobot = %s, tipe = %s WHERE kode = %s",
+            (data.nama, bobot, data.tipe, kode)
+        )
+        db.commit()
+        
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Kriteria tidak ditemukan")
+        
+        print(f"PUT /admin/kriteria/{kode} -> updated kriteria")
+        return {"detail": "Kriteria berhasil diperbarui"}
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Gagal memperbarui kriteria: {e}")
+    finally:
+        cursor.close()
+        db.close()
+
+@app.delete("/admin/kriteria/{kode}")
+def delete_kriteria(kode: str):
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    
+    try:
+        cursor.execute("DELETE FROM kriteria WHERE kode = %s", (kode,))
+        db.commit()
+        
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Kriteria tidak ditemukan")
+        
+        print(f"DELETE /admin/kriteria/{kode} -> deleted kriteria")
+        return {"detail": "Kriteria berhasil dihapus"}
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Gagal menghapus kriteria: {e}")
     finally:
         cursor.close()
         db.close()
