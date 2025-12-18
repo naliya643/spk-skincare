@@ -132,6 +132,7 @@ def get_produk(kandungan: Optional[str] = None):
         db.close()
 
 # ==== ROUTE ADMIN PRODUK ====
+@app.get("/admin/produk")
 def get_all_produk():
     db = get_db()
     cursor = db.cursor(dictionary=True)
