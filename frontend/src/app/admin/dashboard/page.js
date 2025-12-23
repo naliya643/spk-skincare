@@ -31,8 +31,8 @@ export default function AdminDashboard() {
                       hover:${COLORS.buttonBg} transition duration-200 block`}
           style={{ borderColor: COLORS.greenText }} // Border
         >
-          <h2 className="text-xl font-bold" style={{ color: COLORS.greenText }}>Kelola Kriteria</h2>
-          <p className="mt-2 text-sm text-gray-600">Tambah/ubah bobot kriteria TOPSIS.</p>
+          <h2 className="text-xl font-bold" style={{ color: COLORS.greenText }}>Lihat Kriteria</h2>
+          <p className="mt-2 text-sm text-gray-600">Lihat kriteria untuk SPK.</p>
         </a>
 
         {/* CARD 2: Kelola Kandungan */}
@@ -54,7 +54,7 @@ export default function AdminDashboard() {
           style={{ borderColor: COLORS.greenText }} // Border
         >
           <h2 className="text-xl font-bold" style={{ color: COLORS.greenText }}>Kelola Produk</h2>
-          <p className="mt-2 text-sm text-gray-600">Tambah/ubah produk yang mengandung kandungan.</p>
+          <p className="mt-2 text-sm text-gray-600">Tambah/ubah produk rekomendasi.</p>
         </a>
         
       </div>

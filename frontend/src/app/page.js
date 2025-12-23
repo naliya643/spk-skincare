@@ -1,3 +1,4 @@
+"use client";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -15,6 +16,28 @@ const COLORS = {
 export default function Home() {
   return (
     <section className={`min-h-screen ${COLORS.bgMain} relative overflow-hidden`}>
+      {/* Animasi murni CSS tanpa merusak layout */}
+      <style jsx global>{`
+        @keyframes fadeInBlur {
+          from {
+            opacity: 0;
+            filter: blur(5px);
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            filter: blur(0);
+            transform: translateY(0);
+          }
+        }
+        .reveal {
+          animation: fadeInBlur 0.8s ease-out forwards;
+          opacity: 0;
+        }
+        .delay-logo { animation-delay: 0.1s; }
+        .delay-tag { animation-delay: 0.4s; }
+        .delay-btn { animation-delay: 0.7s; }
+      `}</style>
 
       {/* Lengkungan putih */}
       <div
@@ -36,33 +59,34 @@ export default function Home() {
         style={{ marginTop: "-60px" }}
       >
         {/* LOGO */}
-        <Image
-          src="/logobaru.png"
-          alt="Logo SPK Skincare"
-          width={250}
-          height={250}
-          className="object-contain mb-1"
-          priority
-        />
+        <div className="reveal delay-logo">
+          <Image
+            src="/logobaru.png"
+            alt="Logo SPK Skincare"
+            width={250}
+            height={250}
+            className="object-contain mb-1"
+            priority
+          />
+        </div>
 
-        {/* Tagline */}
-            <h3
-       className="text-lg max-w-xl leading-relaxed mb-15 -mt-17"
+        {/* Tagline - Jarak -mt-17 dan mb-15 tetap dipertahankan */}
+        <h3
+          className="text-lg max-w-xl leading-relaxed mb-15 -mt-17 reveal delay-tag"
+          style={{
+            fontFamily: "Segoe UI, Arial, sans-serif",
+            color: COLORS.greenText,
+          }}
+        >
+          Temukan Kandungan Skincare Paling Tepat Untuk Kulitmu Dan Dapatkan
+          Kulit Sehat Impianmu!
+        </h3>
 
-        style={{
-          fontFamily: "Segoe UI, Arial, sans-serif",
-          color: COLORS.greenText,
-        }}
-      >
-        Temukan Kandungan Skincare Paling Tepat Untuk Kulitmu Dan Dapatkan
-        Kulit Sehat Impianmu!
-      </h3> 
-
-        {/* Tombol */}
-        <div className="flex flex-col md:flex-row gap-6 mt-2">
+        {/* Tombol - Layout Flex Row/Col asli tetap dipertahankan */}
+        <div className="flex flex-col md:flex-row gap-6 mt-2 reveal delay-btn">
           <Link
             href="/analisis"
-            className={`px-10 py-3 rounded-full text-base shadow-md transition ${COLORS.buttonBg} ${COLORS.buttonHover}`}
+            className={`px-10 py-3 rounded-full text-base shadow-md transition-all duration-300 ${COLORS.buttonBg} ${COLORS.buttonHover} hover:scale-105`}
             style={{
               fontFamily: "Segoe UI, Arial, sans-serif",
               fontWeight: 600,
@@ -74,20 +98,20 @@ export default function Home() {
 
           <Link
             href="/info-jerawat"
-            className={`px-10 py-3 rounded-full text-base shadow-md transition ${COLORS.buttonBg} ${COLORS.buttonHover}`}
+            className={`px-10 py-3 rounded-full text-base shadow-md transition-all duration-300 ${COLORS.buttonBg} ${COLORS.buttonHover} hover:scale-105`}
             style={{
               fontFamily: "Segoe UI, Arial, sans-serif",
               fontWeight: 600,
               color: COLORS.greenText,
             }}
           >
-            Informasi Jerawat
+            Pelajari Jerawat
           </Link>
         </div>
       </main>
 
       {/* CONTACT SECTION */}
-      <div className="text-center mt-16 px-6" id="contact">
+      <div className="text-center mt-16 px-6 reveal delay-btn" id="contact">
         <h2
           className="text-3xl font-bold mb-6"
           style={{ color: COLORS.title }}
@@ -132,7 +156,7 @@ export default function Home() {
         style={{ backgroundColor: COLORS.footerBg }}
       >
         <p className="text-sm">
-          © 2025 <span className="font-semibold">SPK Skincare</span>. All Rights Reserved.
+          © 2025 <span className="font-semibold">SPK Skincare</span> | Hilaliya's Project
         </p>
 
         <div className="mt-3">

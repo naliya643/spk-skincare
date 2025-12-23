@@ -1,8 +1,14 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+
 export default function InformasiPage() {
+  const router = useRouter();
+
   const COLORS = {
-    bg: "#F4F7F2",            // background lembut
-    text: "#2F4F3A",          // hijau elegan
-    title: "#2F4F3A",         // judul
+    bg: "#F4F7F2",
+    text: "#2F4F3A",
+    title: "#2F4F3A",
     cardBg: "#FFFFFF",
   };
 
@@ -14,43 +20,77 @@ export default function InformasiPage() {
     {
       img: "/papulaacne.jpg",
       title: "Jerawat Papula",
-      desc: "Papula adalah benjolan kecil berwarna merah tanpa nanah, biasanya terasa nyeri saat disentuh."
+      desc: "Papula adalah benjolan kecil berwarna merah tanpa nanah dan terasa nyeri saat disentuh.",
     },
     {
       img: "/jerawat_pustula.jpeg",
       title: "Jerawat Pustula",
-      desc: "Pustula adalah jerawat dengan kepala putih atau kuning berisi nanah akibat peradangan."
+      desc: "Pustula memiliki kepala putih/kuning berisi nanah akibat peradangan.",
     },
     {
       img: "/kistikacne.jpg",
       title: "Jerawat Kistik",
-      desc: "Jerawat kistik berukuran besar dan berisi nanah jauh di dalam kulit. Sering meninggalkan bekas."
+      desc: "Jerawat besar dan dalam yang penuh nanah, biasanya meninggalkan bekas.",
     },
     {
       img: "/nodulacne.jpeg",
       title: "Jerawat Nodul",
-      desc: "Nodul adalah jerawat keras, besar, dan menyakitkan tanpa nanah yang terbentuk di lapisan kulit dalam."
+      desc: "Benjolan keras dan dalam tanpa nanah, terasa sakit dan sulit hilang.",
     },
     {
       img: "/komedoacne.jpg",
       title: "Komedo",
-      desc: "Komedo terjadi ketika pori tersumbat minyak dan sel kulit mati, bisa berupa hitam atau putih."
-    }
+      desc: "Pori yang tersumbat oleh minyak dan sel kulit mati, bisa hitam atau putih.",
+    },
+    {
+      img: "/fungal acne.jpg",
+      title: "Jerawat Jamur (Fungal Acne)",
+      desc: "Bruntusan meradang akibat pertumbuhan jamur Malassezia, muncul berupa bintik kecil seragam dan gatal.",
+    },
   ];
 
   return (
     <main
-      className="min-h-screen p-6"
-      style={{
-        backgroundColor: COLORS.bg,
-        ...FONT,
-      }}
+      className="min-h-screen p-6 relative"
+      style={{ backgroundColor: COLORS.bg, ...FONT }}
     >
+      {/* === TOMBOL BACK BULAT === */}
+<button
+  onClick={() => router.back()}
+  className="
+    fixed top-65 left-6 z-50
+    w-10 h-10 rounded-full
+    flex items-center justify-center
+    bg-white text-[#2F4F3A]
+    shadow-md
+    transition-all duration-200 ease-out
+    hover:scale-105
+    hover:shadow-lg
+    hover:bg-[#E6F9E6]
+    active:scale-95
+    group
+  "
+  aria-label="Kembali"
+>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="transition-transform duration-200 group-hover:-translate-x-0.5"
+  >
+    <path d="M15 18l-6-6 6-6" />
+  </svg>
+</button>
+
       <h1
         className="text-3xl font-bold text-center mb-3"
-        style={{
-          color: COLORS.title,
-        }}
+        style={{ color: COLORS.title }}
       >
         Ayo Mengenal Jenis-Jenis Jerawat
       </h1>
@@ -63,85 +103,60 @@ export default function InformasiPage() {
         perawatan yang tepat sesuai kondisi kulitmu.
       </p>
 
-      {/* Grid custom */}
       <div className="max-w-5xl mx-auto space-y-8">
-
-        {/* Baris 1 → 2 foto */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {dataJerawat.slice(0, 2).map((item, index) => (
-            <div
-              key={index}
-              className="p-4 rounded-2xl shadow-md"
-              style={{ backgroundColor: COLORS.cardBg }}
-            >
-              <img
-                src={item.img}
-                alt={item.title}
-                className="w-full h-40 object-cover rounded-xl mb-3"
-              />
-              <h2
-                className="text-xl font-semibold"
-                style={{ color: COLORS.title }}
-              >
-                {item.title}
-              </h2>
-              <p className="text-sm mt-1" style={{ color: COLORS.text }}>
-                {item.desc}
-              </p>
-            </div>
+            <Card key={index} item={item} COLORS={COLORS} />
           ))}
         </div>
 
-        {/* Baris 2 → 2 foto */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {dataJerawat.slice(2, 4).map((item, index) => (
-            <div
-              key={index}
-              className="p-4 rounded-2xl shadow-md"
-              style={{ backgroundColor: COLORS.cardBg }}
-            >
-              <img
-                src={item.img}
-                alt={item.title}
-                className="w-full h-40 object-cover rounded-xl mb-3"
-              />
-              <h2
-                className="text-xl font-semibold"
-                style={{ color: COLORS.title }}
-              >
-                {item.title}
-              </h2>
-              <p className="text-sm mt-1" style={{ color: COLORS.text }}>
-                {item.desc}
-              </p>
-            </div>
+            <Card key={index} item={item} COLORS={COLORS} />
           ))}
         </div>
 
-        {/* Baris 3 → 1 foto */}
-        <div className="flex justify-center">
-          <div
-            className="p-4 rounded-2xl shadow-md max-w-sm"
-            style={{ backgroundColor: COLORS.cardBg }}
-          >
-            <img
-              src={dataJerawat[4].img}
-              alt={dataJerawat[4].title}
-              className="w-full h-40 object-cover rounded-xl mb-3"
-            />
-            <h2
-              className="text-xl font-semibold"
-              style={{ color: COLORS.title }}
-            >
-              {dataJerawat[4].title}
-            </h2>
-            <p className="text-sm mt-1" style={{ color: COLORS.text }}>
-              {dataJerawat[4].desc}
-            </p>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {dataJerawat.slice(4, 6).map((item, index) => (
+            <Card key={index} item={item} COLORS={COLORS} />
+          ))}
         </div>
+      </div>
 
+      {/* === TOMBOL LANJUT ANALISIS === */}
+      <div className="flex justify-center mt-6">
+        <button
+          onClick={() => router.push("/analisis")}
+          className="px-12 py-4 rounded-full font-semibold shadow-lg transition active:scale-95"
+          style={{
+            backgroundColor: COLORS.title,
+            color: "white",
+          }}
+        >
+          Lanjut Analisis
+        </button>
       </div>
     </main>
+  );
+}
+
+function Card({ item, COLORS }) {
+  return (
+    <div
+      className="p-4 rounded-2xl shadow-md"
+      style={{ backgroundColor: COLORS.cardBg }}
+    >
+      <img
+        src={item.img}
+        alt={item.title}
+        className="w-full h-40 object-cover rounded-xl mb-3"
+      />
+      <h2 className="text-xl font-semibold" style={{ color: COLORS.title }}>
+        {item.title}
+      </h2>
+      <p className="text-sm mt-1" style={{ color: COLORS.text }}>
+        {item.desc}
+      </p>
+    </div>
   );
 }

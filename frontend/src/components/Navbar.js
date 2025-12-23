@@ -36,7 +36,7 @@ export default function Navbar() {
               className={`transition-all duration-200 ${COLORS.hover}`}
               style={{ color: COLORS.text }}
             >
-              About Us
+              Tentang Kami
               <span className="absolute left-1/2 -bottom-1 w-0 h-[2px] bg-[#1F392C] transition-all duration-200 group-hover:w-full group-hover:left-0"></span>
             </Link>
           </li>

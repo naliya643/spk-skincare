@@ -2,69 +2,74 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../AdminLayout";
 
-// Pastikan URL API ini benar (sesuai port FastAPI kamu)
 const API = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export default function ProdukPage() {
   const [list, setList] = useState([]);
-  
-  // 🛑 STATE UNTUK TAMBAH PRODUK 🛑
-  const [form, setForm] = useState({ 
-    nama: "", 
-    harga: "", 
-    kandungan: "", 
-    foto: null, 
-    deskripsi: "" 
+  const [fetchError, setFetchError] = useState(null);
+  const [diagnostics, setDiagnostics] = useState([]);
+
+  const [form, setForm] = useState({
+    nama: "",
+    harga: "",
+    kandungan: "",
+    foto: null,
+    deskripsi: "",
   });
-  
-  // 🛑 STATE UNTUK EDIT PRODUK 🛑
-  const [editingId, setEditingId] = useState(null); 
-  // State untuk menampung data produk yang sedang diedit
-  const [currentEditForm, setCurrentEditForm] = useState(null); 
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  const [editingId, setEditingId] = useState(null);
+  const [currentEditForm, setCurrentEditForm] = useState(null);
 
   const token = typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
 
-  useEffect(()=>{ fetchAll(); },[]);
-
-  // ----------------------------------------------------
-  // FUNGSI UTAMA
-  // ----------------------------------------------------
+  useEffect(() => {
+    fetchAll();
+  }, []);
 
   async function fetchAll() {
-    try {
-      const res = await fetch(`${API}/admin/produk`, { 
-        headers: token ? { Authorization: `Bearer ${token}` } : {} 
-      });
-      const j = await res.json();
-      
-      let fetchedList = [];
-      if (res.ok) {
-        // Handle jika API mengembalikan array langsung atau object dengan properti 'data'
-        if (Array.isArray(j.data)) {
-          fetchedList = j.data;
-        } else if (Array.isArray(j)) {
-          fetchedList = j;
-        }
-      } else {
-        console.error("Fetch Produk Gagal:", j);
-        alert(j.detail || "Gagal mengambil data produk.");
+    const candidateBases = [API, "http://127.0.0.1:8000", "http://localhost:8000"];
+    const attempts = [];
+    const options = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+
+    async function tryFetch(url) {
+      try {
+        const res = await fetch(url, options);
+        let body;
+        try { body = await res.json(); } catch (err) { body = await res.text(); }
+        return { ok: true, status: res.status, body, url };
+      } catch (err) {
+        return { ok: false, error: err.message || String(err), url };
       }
-      setList(fetchedList);
-      
-    } catch (e) {
-      console.error("Koneksi gagal saat fetch produk:", e);
-      // Di sini biasanya muncul alert "Gagal terhubung ke API"
+    }
+
+    let finalList = [];
+    for (const base of candidateBases) {
+      const url = `${base.replace(/\/+$/, "")}/admin/produk`;
+      const result = await tryFetch(url);
+      attempts.push(result);
+
+      if (result.ok && result.status >= 200 && result.status < 300) {
+        const j = result.body;
+        if (Array.isArray(j)) finalList = j;
+        else if (j && Array.isArray(j.data)) finalList = j.data;
+        break;
+      }
+    }
+
+    if (finalList.length > 0) {
+      setList(finalList);
+      setFetchError(null);
+      setDiagnostics(attempts);
+    } else {
       setList([]);
+      setFetchError("Gagal mengambil data produk.");
+      setDiagnostics(attempts);
     }
   }
 
-  // ----------------------------------------------------
-  // CREATE (TAMBAH)
-  // ----------------------------------------------------
   async function handleAdd(e) {
     e.preventDefault();
-    
-    // Gunakan FormData karena ada file (foto)
     const fd = new FormData();
     fd.append("nama", form.nama);
     fd.append("harga", form.harga);
@@ -73,68 +78,55 @@ export default function ProdukPage() {
     if (form.foto) fd.append("foto", form.foto);
 
     try {
-      const res = await fetch(`${API}/admin/produk`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
+      const options = token
+        ? { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd }
+        : { method: "POST", body: fd };
+      const res = await fetch(`${API}/admin/produk`, options);
 
-      if (res.ok) { 
-        // Reset form
-        setForm({ nama: "", harga: "", kandungan: "", foto: null, deskripsi: "" }); 
-        document.getElementById('file-input-produk').value = null; // Reset input file
-        fetchAll(); 
-      }
-      else { 
-        const j = await res.json(); 
-        alert(j.detail || "Gagal tambah produk"); 
+      if (res.ok) {
+        setForm({ nama: "", harga: "", kandungan: "", foto: null, deskripsi: "" });
+        const fileInput = document.getElementById("file-input-produk");
+        if (fileInput) fileInput.value = null;
+        setShowAddForm(false);
+        fetchAll();
+      } else {
+        const j = await res.json();
+        alert(j.detail || "Gagal tambah produk");
       }
     } catch (err) {
-      console.error(err);
-      alert("Gagal terhubung ke API saat menambah produk.");
+      alert("Gagal terhubung ke API.");
     }
   }
 
-  // ----------------------------------------------------
-  // DELETE (HAPUS)
-  // ----------------------------------------------------
   async function handleDelete(id) {
     if (!confirm("Hapus produk?")) return;
     try {
-      const res = await fetch(`${API}/admin/produk/${id}`, { 
-        method: "DELETE", 
-        headers: { Authorization: `Bearer ${token}` } 
-      });
-      
-      if (res.ok) {
-        fetchAll();
-      } else {
+      const options = token
+        ? { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
+        : { method: "DELETE" };
+      const res = await fetch(`${API}/admin/produk/${id}`, options);
+      if (res.ok) fetchAll();
+      else {
         const j = await res.json();
         alert(j.detail || "Gagal hapus produk.");
       }
     } catch (e) {
-      console.error(e);
-      alert("Gagal terhubung ke API saat menghapus produk.");
+      alert("Gagal terhubung ke API.");
     }
   }
 
-  // ----------------------------------------------------
-  // UPDATE (EDIT)
-  // ----------------------------------------------------
   function startEdit(product) {
     setEditingId(product.id);
-    // Isi form edit dengan data produk yang diklik
     setCurrentEditForm({
       id: product.id,
       nama: product.nama,
       harga: product.harga,
       kandungan: product.kandungan,
       deskripsi: product.deskripsi,
-      // Foto di-set null, user harus upload baru jika ingin ganti
-      foto: null 
+      foto: null,
     });
   }
-  
+
   function cancelEdit() {
     setEditingId(null);
     setCurrentEditForm(null);
@@ -145,161 +137,155 @@ export default function ProdukPage() {
     if (!editingId) return;
 
     const fd = new FormData();
-    // Gunakan currentEditForm untuk update
     fd.append("nama", currentEditForm.nama);
     fd.append("harga", currentEditForm.harga);
     fd.append("kandungan", currentEditForm.kandungan);
     fd.append("deskripsi", currentEditForm.deskripsi);
-    // Cek apakah ada file baru yang dipilih untuk diupload
     if (currentEditForm.foto) fd.append("foto", currentEditForm.foto);
-    
-    try {
-      const res = await fetch(`${API}/admin/produk/${editingId}`, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
 
-      if (res.ok) { 
-        cancelEdit(); // Tutup form edit
-        fetchAll(); // Refresh data
-      }
-      else { 
-        const j = await res.json(); 
-        alert(j.detail || "Gagal update produk"); 
+    try {
+      const options = token
+        ? { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: fd }
+        : { method: "PUT", body: fd };
+      const res = await fetch(`${API}/admin/produk/${editingId}`, options);
+
+      if (res.ok) {
+        cancelEdit();
+        fetchAll();
+      } else {
+        const j = await res.json();
+        alert(j.detail || "Gagal update produk");
       }
     } catch (err) {
-      console.error(err);
-      alert("Gagal terhubung ke API saat memperbarui produk.");
+      alert("Gagal terhubung ke API.");
     }
   }
 
-
-  // ----------------------------------------------------
-  // JSX RENDER
-  // ----------------------------------------------------
   return (
     <AdminLayout>
-      <h1 className="text-3xl font-bold text-[#FF7FA5] mb-6">Data Produk</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-[#2F4F3A]">Data Produk</h1>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="px-4 py-2 bg-[#2F4F3A] text-white rounded hover:bg-green-700 transition flex items-center gap-2 font-semibold shadow-sm"
+        >
+          {showAddForm ? "Tutup Form" : (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              Tambah Produk
+            </>
+          )}
+        </button>
+      </div>
 
-      {/* 1. FORM TAMBAH PRODUK */}
-      <form onSubmit={handleAdd} className="bg-white p-4 rounded-xl shadow mb-6">
-        <h2 className="text-xl font-bold text-[#FF7FA5] mb-4">Tambah Produk Baru</h2>
-        <input className="w-full p-2 border rounded mb-2" placeholder="Nama Produk" value={form.nama} onChange={(e)=>setForm({...form,nama:e.target.value})} required />
-        <input className="w-full p-2 border rounded mb-2" placeholder="Harga" type="number" value={form.harga} onChange={(e)=>setForm({...form,harga:e.target.value})} required />
-
-        <input 
-            className="w-full p-2 border rounded mb-2" 
-            placeholder="Kandungan (Ketik nama kandungan)" 
-            value={form.kandungan} 
-            onChange={(e)=>setForm({...form,kandungan:e.target.value})} 
-            required 
-        />
-        <textarea className="w-full p-2 border rounded mb-2" placeholder="Deskripsi" value={form.deskripsi} onChange={(e)=>setForm({...form,deskripsi:e.target.value})} />
-
-        {/* INPUT FILE FOTO (DENGAN STYLE AGAR TERLIHAT) */}
-        <div className="mb-4">
-          <label htmlFor="file-input-produk" className="block text-sm font-medium text-gray-700 mb-1">
-            Foto Produk (Opsional)
-          </label>
-          <input 
-            type="file" 
-            accept="image/*" 
-            onChange={(e)=>setForm({...form,foto:e.target.files[0]})} 
-            id="file-input-produk"
-            // --- STYLE AGAR TERLIHAT JELAS ---
-            className="block w-full text-sm text-gray-500
-              file:mr-4 file:py-2 file:px-4
-              file:rounded-full file:border-0
-              file:text-sm file:font-semibold
-              file:bg-pink-50 file:text-[#FF7FA5]
-              hover:file:bg-pink-100"
-            // ---------------------------------
-          />
-        </div>
-        <button className="px-4 py-2 bg-[#FF7FA5] text-white rounded">Tambah Produk</button>
-      </form>
-
-      {/* 2. FORM EDIT PRODUK (TAMPIL JIKA editingId ADA) */}
+      {/* MODAL FORM EDIT - LATAR BELAKANG TRANSPARAN & BLUR */}
       {editingId && currentEditForm && (
-        <form onSubmit={handleUpdate} className="bg-yellow-50 p-6 rounded-xl shadow-lg mb-6 border-2 border-yellow-400">
-          <h2 className="text-xl font-bold text-yellow-700 mb-4">Edit Produk ID: {editingId}</h2>
-          
-          <input 
-            className="w-full p-2 border rounded mb-2" 
-            placeholder="Nama Produk" 
-            value={currentEditForm.nama} 
-            onChange={(e)=>setCurrentEditForm({...currentEditForm,nama:e.target.value})} 
-            required 
-          />
-          <input 
-            className="w-full p-2 border rounded mb-2" 
-            placeholder="Harga" 
-            type="number" 
-            value={currentEditForm.harga} 
-            onChange={(e)=>setCurrentEditForm({...currentEditForm,harga:e.target.value})} 
-            required 
-          />
-          <input 
-            className="w-full p-2 border rounded mb-2" 
-            placeholder="Kandungan" 
-            value={currentEditForm.kandungan} 
-            onChange={(e)=>setCurrentEditForm({...currentEditForm,kandungan:e.target.value})} 
-            required 
-          />
-          <textarea 
-            className="w-full p-2 border rounded mb-2" 
-            placeholder="Deskripsi" 
-            value={currentEditForm.deskripsi} 
-            onChange={(e)=>setCurrentEditForm({...currentEditForm,deskripsi:e.target.value})} 
-          />
-          
-          <p className="text-sm text-gray-500 mb-2">Ganti Foto (Opsional):</p>
-          <input 
-            type="file" 
-            accept="image/*" 
-            onChange={(e)=>setCurrentEditForm({...currentEditForm,foto:e.target.files[0]})} 
-            className="mb-3" 
-          />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6 border-b pb-3">
+                <h2 className="text-xl font-bold text-[#2F4F3A]">Edit Produk</h2>
+                <button onClick={cancelEdit} className="text-gray-400 hover:text-gray-600">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
-          <div className="flex gap-2">
-            <button type="submit" className="px-4 py-2 bg-yellow-600 text-white rounded">Simpan Perubahan</button>
-            <button type="button" onClick={cancelEdit} className="px-4 py-2 bg-gray-400 text-white rounded">Batal</button>
+              <form onSubmit={handleUpdate} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-1 text-gray-700">Nama Produk</label>
+                  <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none transition" value={currentEditForm.nama} onChange={(e) => setCurrentEditForm({ ...currentEditForm, nama: e.target.value })} required />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold mb-1 text-gray-700">Harga</label>
+                    <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none transition" type="number" value={currentEditForm.harga} onChange={(e) => setCurrentEditForm({ ...currentEditForm, harga: e.target.value })} required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1 text-gray-700">Kandungan</label>
+                    <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none transition" value={currentEditForm.kandungan} onChange={(e) => setCurrentEditForm({ ...currentEditForm, kandungan: e.target.value })} required />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-1 text-gray-700">Deskripsi</label>
+                  <textarea rows="3" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none transition" value={currentEditForm.deskripsi} onChange={(e) => setCurrentEditForm({ ...currentEditForm, deskripsi: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-1 text-gray-700">Ganti Foto (Opsional)</label>
+                  <input type="file" accept="image/*" onChange={(e) => setCurrentEditForm({ ...currentEditForm, foto: e.target.files[0] })} className="text-sm block w-full file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-green-50 file:text-green-700" />
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t">
+                  <button type="submit" className="flex-1 py-2.5 bg-[#2F4F3A] text-white rounded-lg font-bold hover:bg-green-800 transition shadow-md">Simpan Perubahan</button>
+                  <button type="button" onClick={cancelEdit} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-lg font-bold hover:bg-gray-200 transition">Batal</button>
+                </div>
+              </form>
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* FORM TAMBAH */}
+      {showAddForm && (
+        <form onSubmit={handleAdd} className="bg-white p-6 rounded-xl shadow-md mb-8 border border-gray-100 animate-in slide-in-from-top-4 duration-300">
+          <h2 className="text-xl font-bold text-[#2F4F3A] mb-4">Tambah Produk Baru</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <input className="p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-green-500 transition" placeholder="Nama Produk" value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} required />
+            <input className="p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-green-500 transition" placeholder="Harga" type="number" value={form.harga} onChange={(e) => setForm({ ...form, harga: e.target.value })} required />
+            <input className="p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-green-500 transition" placeholder="Kandungan" value={form.kandungan} onChange={(e) => setForm({ ...form, kandungan: e.target.value })} required />
+            <input type="file" accept="image/*" onChange={(e) => setForm({ ...form, foto: e.target.files[0] })} id="file-input-produk" className="p-1 border rounded-lg text-sm bg-gray-50" />
+          </div>
+          <textarea className="w-full p-2.5 border rounded-lg mb-4 outline-none focus:ring-2 focus:ring-green-500 transition" placeholder="Deskripsi" value={form.deskripsi} onChange={(e) => setForm({ ...form, deskripsi: e.target.value })} />
+          <button className="px-6 py-2.5 bg-[#2F4F3A] text-white rounded-lg font-bold hover:bg-green-700 transition shadow-sm">Tambah Produk</button>
         </form>
       )}
 
-
-      {/* 3. TABEL DATA PRODUK */}
-      <div className="bg-white rounded-xl shadow p-3">
+      {/* TABEL PRODUK */}
+      <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
         <table className="w-full">
-          <thead className="bg-[#FFE8F0] text-[#FF7FA5]">
-            <tr><th className="p-2">#</th><th>Nama</th><th>Kandungan</th><th>Harga</th><th>Foto</th><th>Aksi</th></tr>
+          <thead className="bg-green-50 text-[#2F4F3A]">
+            <tr className="text-left font-semibold">
+              <th className="p-4">#</th>
+              <th className="p-4">Nama</th>
+              <th className="p-4">Kandungan</th>
+              <th className="p-4">Harga</th>
+              <th className="p-4">Foto</th>
+              <th className="p-4 text-center">Aksi</th>
+            </tr>
           </thead>
           <tbody>
-            {Array.isArray(list) && list.map((p,i)=>(
-              <tr key={p.id || i} className="border-b text-sm">
-                <td className="p-2">{i+1}</td>
-                <td className="p-2">{p.nama}</td>
-                <td className="p-2">{p.kandungan || '-'}</td> 
-                <td className="p-2">{p.harga}</td>
-                <td className="p-2">
-                  {/* URL API digabung dengan path foto dari DB */}
-                  {p.foto ? <img src={`${API}${p.foto}`} alt={p.nama} className="w-14 h-14 object-cover rounded" /> : "-"}
+            {Array.isArray(list) && list.map((p, i) => (
+              <tr key={p.id || i} className="border-b hover:bg-green-50/20 transition">
+                <td className="p-4 text-gray-500">{i + 1}</td>
+                <td className="p-4 font-semibold text-gray-800">{p.nama}</td>
+                <td className="p-4 text-gray-600">{p.kandungan || '-'}</td>
+                <td className="p-4 font-mono text-green-700 font-bold">Rp {Number(p.harga).toLocaleString()}</td>
+                <td className="p-4">
+                  {p.foto ? (
+                    <img src={`${API}${String(p.foto).replace(/\\/g, '/').replace(/^\/+/, '/')}`} className="w-12 h-12 object-cover rounded-lg shadow-sm border border-gray-200" alt="" />
+                  ) : <div className="w-12 h-12 bg-gray-100 rounded-lg border border-dashed flex items-center justify-center text-[10px] text-gray-400 text-center px-1">No Pic</div>}
                 </td>
-                <td className="p-2">
-                    <button onClick={()=>startEdit(p)} className="text-blue-500 mr-2">Edit</button>
-                    <button onClick={()=>handleDelete(p.id)} className="text-red-500">Hapus</button>
+                <td className="p-4">
+                  <div className="flex justify-center gap-2">
+                    <button onClick={() => startEdit(p)} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-md hover:bg-blue-700 transition shadow-sm">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      Edit
+                    </button>
+                    <button onClick={() => handleDelete(p.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-md hover:bg-red-600 transition shadow-sm">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Hapus
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
-            {Array.isArray(list) && list.length === 0 && (
-                <tr>
-                    <td colSpan="6" className="p-4 text-center text-gray-500">
-                        Tidak ada data produk.
-                    </td>
-                </tr>
-            )}
           </tbody>
         </table>
       </div>
